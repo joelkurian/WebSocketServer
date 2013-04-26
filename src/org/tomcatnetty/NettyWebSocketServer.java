@@ -26,14 +26,14 @@ public class NettyWebSocketServer implements ServletContextListener {
 	 * @see ServletContextListener#contextInitialized(ServletContextEvent)
 	 */
 	public void contextInitialized(ServletContextEvent arg0) {
-		 new WebSocketServer(8000);
-//		Websockify websockify = new Websockify();
-//		try {
-//			websockify.doMain(null);
-//		} catch (Exception e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
+//		 new WebSocketServer(8000);
+		Websockify websockify = new Websockify();
+		try {
+			websockify.doMain(null);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	/**

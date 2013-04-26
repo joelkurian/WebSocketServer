@@ -45,6 +45,7 @@ import org.jboss.netty.channel.FileRegion;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
+import org.jboss.netty.handler.codec.base64.Base64;
 import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpRequest;
@@ -178,6 +179,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			// Handshake
 			WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(this.getWebSocketLocation(req), "base64", false);
 			this.handshaker = wsFactory.newHandshaker(req);
+			ChannelFuture future = null;
 			if (this.handshaker == null) {
 				wsFactory.sendUnsupportedWebSocketVersionResponse(ctx.getChannel());
 			} else {
@@ -189,7 +191,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 				if (protocol != null && secProtocol == null) {
 					req.addHeader("Sec-WebSocket-Protocol", protocol);
 				}
-				this.handshaker.handshake(ctx.getChannel(), req).syncUninterruptibly();
+				future = this.handshaker.handshake(ctx.getChannel(), req).syncUninterruptibly();
 			}
 			LiveSession liveSession = new LiveSession();
 			if (req.getHeader("server") != null && req.getHeader("server").equals("vncserver")) {
@@ -197,10 +199,9 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 				liveSession.setServerChannel(e.getChannel());
 				WebsockifyProxyHandler.sessionMap.put(0, liveSession);
 			} else {
-//				WebsockifyProxyHandler.sessionMap.get(0).setClientChannel(e.getChannel());
-//				this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getServerChannel();
+				WebsockifyProxyHandler.sessionMap.get(0).setClientChannel(e.getChannel());
+				this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getServerChannel();
 			}
-//			e.getChannel().write(new TextWebSocketFrame("channel id is - " + LiveSession.sessionCount));
 //			e.getChannel().write(new TextWebSocketFrame("channel id is - " + LiveSession.sessionCount));
 			// ensureTargetConnection(e, true, null);
 		} else {
@@ -236,22 +237,23 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 
 		TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
 
-//		if (this.outboundChannel == null) {
-//			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getClientChannel();
-//		}
-//		if (this.outboundChannel != null) {
-			ChannelBuffer msg = textFrame.getBinaryData();
-			ctx.getChannel().write(msg);
-			// ChannelBuffer decodedMsg = Base64.decode(msg);
+		if (this.outboundChannel == null) {
+			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getClientChannel();
+		}
+		if (this.outboundChannel != null) {
+//			ChannelBuffer msg = textFrame.getBinaryData();
+//			ctx.getChannel().write(msg);
+//			ChannelBuffer decodedMsg = Base64.decode(msg);
 			synchronized (trafficLock) {
 //				outboundChannel.write(msg);
-//				outboundChannel.write(frame);
-				// If outboundChannel is saturated, do not read until notified in
+				outboundChannel.write(frame);
+				// If outboundChannel is saturated, do not read until notified
+				// in
 				// OutboundHandler.channelInterestChanged().
-//				if (!outboundChannel.isWritable()) {
-//					e.getChannel().setReadable(false);
-//				}
-//			}
+				if (!outboundChannel.isWritable()) {
+					e.getChannel().setReadable(false);
+				}
+			}
 		}
 	}
 
