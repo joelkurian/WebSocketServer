@@ -83,6 +83,7 @@ public class PortUnificationHandler extends FrameDecoder {
 	// the timer fires we'll create the proxy connection to the target
 	@Override
 	public void channelOpen(final ChannelHandlerContext ctx, final ChannelStateEvent e) throws Exception {
+		System.out.println("sco");
 		startDirectConnectionTimer(ctx);
 	}
 
@@ -125,6 +126,7 @@ public class PortUnificationHandler extends FrameDecoder {
 
 	@Override
 	protected Object decode(ChannelHandlerContext ctx, Channel channel, ChannelBuffer buffer) throws Exception {
+		System.out.println("ddd");
 		// Will use the first two bytes to detect a protocol.
 		if (buffer.readableBytes() < 2) {
 			return null;

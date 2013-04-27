@@ -338,6 +338,7 @@ function open(uri, protocols) {
 
     websocket.onmessage = recv_message;
     websocket.onopen = function() {
+    	console.log("booyaah");
         Util.Debug(">> WebSock.onopen");
         if (websocket.protocol) {
             mode = websocket.protocol;
@@ -346,6 +347,8 @@ function open(uri, protocols) {
             mode = 'base64';
             Util.Error("Server select no sub-protocol!: " + websocket.protocol);
         }
+        console.log(123123);
+        console.log(eventHandlers);
         eventHandlers.open();
         Util.Debug("<< WebSock.onopen");
     };

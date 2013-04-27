@@ -151,7 +151,6 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 	@Override
 	public void messageReceived(ChannelHandlerContext ctx, final MessageEvent e) throws Exception {
 		Object msg = e.getMessage();
-		System.out.println(msg);
 		// An HttpRequest means either an initial websocket connection
 		// or a web server request
 		if (msg instanceof HttpRequest) {
@@ -201,8 +200,10 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			} else {
 				WebsockifyProxyHandler.sessionMap.get(0).setClientChannel(e.getChannel());
 				this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getServerChannel();
+				this.outboundChannel.write(new TextWebSocketFrame("begin"));
 			}
-//			e.getChannel().write(new TextWebSocketFrame("channel id is - " + LiveSession.sessionCount));
+			// e.getChannel().write(new TextWebSocketFrame("channel id is - " +
+			// LiveSession.sessionCount));
 			// ensureTargetConnection(e, true, null);
 		} else {
 			HttpRequest request = (HttpRequest) e.getMessage();
@@ -241,11 +242,11 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getClientChannel();
 		}
 		if (this.outboundChannel != null) {
-//			ChannelBuffer msg = textFrame.getBinaryData();
-//			ctx.getChannel().write(msg);
-//			ChannelBuffer decodedMsg = Base64.decode(msg);
+			// ChannelBuffer msg = textFrame.getBinaryData();
+			// ctx.getChannel().write(msg);
+			// ChannelBuffer decodedMsg = Base64.decode(msg);
 			synchronized (trafficLock) {
-//				outboundChannel.write(msg);
+				// outboundChannel.write(msg);
 				outboundChannel.write(frame);
 				// If outboundChannel is saturated, do not read until notified
 				// in
