@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.activation.MimetypesFileTypeMap;
@@ -45,7 +46,6 @@ import org.jboss.netty.channel.FileRegion;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
-import org.jboss.netty.handler.codec.base64.Base64;
 import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 import org.jboss.netty.handler.codec.http.HttpRequest;
@@ -62,11 +62,14 @@ import org.jboss.netty.handler.ssl.SslHandler;
 import org.jboss.netty.handler.stream.ChunkedFile;
 import org.jboss.netty.util.CharsetUtil;
 
-import aint.it.cool.LiveSession;
+import com.leoj.glitch.pojo.LiveSession;
+
 
 public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 
 	static Map<Integer, LiveSession> sessionMap = new HashMap<Integer, LiveSession>();
+	static Map<String, Channel> serverConnMap = new HashMap<>();
+	static Map<String, Channel> clientConnMap = new HashMap<>();
 
 	private static final String URL_PARAMETER = "url";
 	public static final String HTTP_DATE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
@@ -173,7 +176,15 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 		}
 
 		String upgradeHeader = req.getHeader("Upgrade");
-		if (upgradeHeader != null && upgradeHeader.toUpperCase().equals("WEBSOCKET")) {
+		String vncHeader = req.getHeader("vncserver");
+		boolean isVncServer = false;
+		String requestedServerId = null;
+		if (vncHeader != null && !vncHeader.equals("")) {
+			isVncServer = req.getHeader("vncserver").equals("1") ? true : false;
+		} else {
+			requestedServerId = getServerId(req.getUri());
+		}
+		if (upgradeHeader != null && upgradeHeader.toUpperCase().equals("WEBSOCKET") && (isVncServer || requestedServerId != null)) {
 			Logger.getLogger(WebsockifyProxyHandler.class.getName()).fine("Websocket request from " + e.getRemoteAddress() + ".");
 			// Handshake
 			WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(this.getWebSocketLocation(req), "base64", false);
@@ -192,19 +203,31 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 				}
 				future = this.handshaker.handshake(ctx.getChannel(), req).syncUninterruptibly();
 			}
-			LiveSession liveSession = new LiveSession();
-			if (req.getHeader("server") != null && req.getHeader("server").equals("vncserver")) {
-				liveSession.setId(0);
-				liveSession.setServerChannel(e.getChannel());
-				WebsockifyProxyHandler.sessionMap.put(0, liveSession);
+			if (isVncServer) {
+				String serverId = req.getHeader("ServerId");
+				if (req.getHeader("ServerId") == null) {
+					serverId = UUID.randomUUID().toString();
+					e.getChannel().write(new TextWebSocketFrame("id:" + serverId));
+				}
+				serverConnMap.put(serverId, e.getChannel());
 			} else {
-				WebsockifyProxyHandler.sessionMap.get(0).setClientChannel(e.getChannel());
-				this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getServerChannel();
-				this.outboundChannel.write(new TextWebSocketFrame("begin"));
+				Channel outboundVncChannel = null;
+				if (serverConnMap.containsKey(requestedServerId)) {
+					outboundVncChannel = serverConnMap.get(requestedServerId);
+					this.outboundChannel = outboundVncChannel;
+					LiveSession liveSession = new LiveSession();
+					liveSession.setServerChannel(outboundVncChannel);
+					liveSession.setClientChannel(e.getChannel());
+//					WebsockifyProxyHandler.sessionMap.put(liveSession.getId(), liveSession);
+					WebsockifyProxyHandler.sessionMap.put(123, liveSession);
+				}
+				if (outboundVncChannel == null) {
+					return;
+				}
+				String clientId = UUID.randomUUID().toString();
+				clientConnMap.put(clientId, e.getChannel());
+				outboundVncChannel.write(new TextWebSocketFrame("begin"));
 			}
-			// e.getChannel().write(new TextWebSocketFrame("channel id is - " +
-			// LiveSession.sessionCount));
-			// ensureTargetConnection(e, true, null);
 		} else {
 			HttpRequest request = (HttpRequest) e.getMessage();
 			String redirectUrl = isRedirect(request.getUri());
@@ -223,6 +246,23 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 		}
 	}
 
+	private String getServerId(String uri) {
+		System.out.println("REQUEST URI - " + uri);
+		boolean isSSLEncrypted = false;
+		if (uri.startsWith("wss://")) {
+			isSSLEncrypted = true;
+		} else if (uri.startsWith("ws://")) {
+			isSSLEncrypted = false;
+		} else {
+			// TODO
+		}
+		// String serverId = uri.substring(uri.indexOf((isSSLEncrypted ?
+		// ":8443/" : ":8000/") + 1));
+		String serverId = uri.substring(uri.indexOf("/") + 1);
+		System.out.println(serverId + " serverid");
+		return (serverId != null && !serverId.equals("")) ? serverId : null;
+	}
+
 	private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame, final MessageEvent e) {
 
 		// Check for closing frame
@@ -236,17 +276,11 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			throw new UnsupportedOperationException(String.format("%s frame types not supported", frame.getClass().getName()));
 		}
 
-		TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
-
 		if (this.outboundChannel == null) {
-			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(0).getClientChannel();
+			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(123).getClientChannel();
 		}
 		if (this.outboundChannel != null) {
-			// ChannelBuffer msg = textFrame.getBinaryData();
-			// ctx.getChannel().write(msg);
-			// ChannelBuffer decodedMsg = Base64.decode(msg);
 			synchronized (trafficLock) {
-				// outboundChannel.write(msg);
 				outboundChannel.write(frame);
 				// If outboundChannel is saturated, do not read until notified
 				// in

@@ -10,8 +10,15 @@
 		<welcome-file>default.jsp</welcome-file>
 	</welcome-file-list>
 
-	<listener>
-		<listener-class>org.tomcatnetty.NettyWebSocketServer</listener-class>
-	</listener>
+	<servlet>
+		<servlet-name>SignInServlet</servlet-name>
+		<servlet-class>com.leoj.glitch.servlet.SignInServlet</servlet-class>
+	</servlet>
 
+	<servlet-mapping>
+		<servlet-name>SignInServlet</servlet-name>
+		<url-pattern>/SignIn</url-pattern>
+	</servlet-mapping>
+
+	<!-- <listener> <listener-class>org.tomcatnetty.NettyWebSocketServer</listener-class> </listener> -->
 </web-app>

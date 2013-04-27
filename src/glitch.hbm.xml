@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Generated Nov 15, 2011 11:02:08 AM by Hibernate Tools 3.4.0.CR1 -->
+<hibernate-mapping>
+	<class name="com.leoj.glitch.pojo.User" table="TBLUSER">
+		<id name="id" type="java.lang.String">
+			<column name="id" />
+			<generator class="uuid" />
+		</id>
+		<property name="email" type="java.lang.String">
+			<column name="EMAIL" />
+		</property>
+		<property name="passwd" type="java.lang.String">
+			<column name="PASSWD" />
+		</property>
+		<set name="deviceSet" inverse="true">
+			<key column="USERID" />
+			<one-to-many class="com.leoj.glitch.pojo.Device" />
+		</set>
+	</class>
+
+	<class name="com.leoj.glitch.pojo.Device" table="TBLDEVICE">
+		<id name="id" type="java.lang.String" access="field">
+			<column name="ID" />
+			<generator class="assigned" />
+		</id>
+		<many-to-one name="user" column="USERID" not-null="true" />
+	</class>
+
+</hibernate-mapping>

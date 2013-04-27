@@ -1,7 +1,7 @@
 /**
  * 
  */
-package aint.it.cool;
+package com.leoj.glitch.pojo;
 
 import org.jboss.netty.channel.Channel;
 
@@ -18,6 +18,7 @@ public class LiveSession {
 	private Channel clientChannel = null;
 
 	public LiveSession() {
+		this.id = sessionCount++;
 	}
 
 	public int getId() {
