@@ -54,15 +54,15 @@ public class OutboundHandler extends SimpleChannelUpstreamHandler {
     @Override
     public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e)
             throws Exception {
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Outbound proxy connection to " + ctx.getChannel().getRemoteAddress() + " closed.");
-        WebsockifyProxyHandler.closeOnFlush(inboundChannel);
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).info("Outbound proxy connection to " + ctx.getChannel().getRemoteAddress() + " closed.");
+        WebSocketProxyHandler.closeOnFlush(inboundChannel);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception {
         e.getCause().printStackTrace();
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe("Exception on outbound proxy connection to " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
-        WebsockifyProxyHandler.closeOnFlush(e.getChannel());
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).severe("Exception on outbound proxy connection to " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
+        WebSocketProxyHandler.closeOnFlush(e.getChannel());
     }
 }

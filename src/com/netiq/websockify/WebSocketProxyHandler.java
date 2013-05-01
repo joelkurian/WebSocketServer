@@ -64,8 +64,7 @@ import org.jboss.netty.util.CharsetUtil;
 
 import com.leoj.glitch.pojo.LiveSession;
 
-
-public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
+public class WebSocketProxyHandler extends SimpleChannelUpstreamHandler {
 
 	static Map<Integer, LiveSession> sessionMap = new HashMap<Integer, LiveSession>();
 	static Map<String, Channel> serverConnMap = new HashMap<>();
@@ -89,67 +88,11 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 
 	private volatile Channel outboundChannel;
 
-	public WebsockifyProxyHandler(ClientSocketChannelFactory cf, String webDirectory) {
+	public WebSocketProxyHandler(ClientSocketChannelFactory cf, String webDirectory) {
 		this.cf = cf;
 		// this.outboundChannel = null;
 		this.webDirectory = webDirectory;
 	}
-
-	// private void ensureTargetConnection(ChannelEvent e, boolean websocket,
-	// final Object sendMsg) throws Exception {
-	// if (outboundChannel == null) {
-	// // Suspend incoming traffic until connected to the remote host.
-	// final Channel inboundChannel = e.getChannel();
-	// inboundChannel.setReadable(false);
-	// Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Inbound proxy connection from "
-	// + inboundChannel.getRemoteAddress() + ".");
-	//
-	// // resolve the target
-	// final InetSocketAddress target = resolver.resolveTarget(inboundChannel);
-	// if (target == null) {
-	// Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe("Connection from "
-	// + inboundChannel.getRemoteAddress() + " failed to resolve target.");
-	// // there is no target
-	// inboundChannel.close();
-	// return;
-	// }
-	//
-	// // Start the connection attempt.
-	// ClientBootstrap cb = new ClientBootstrap(cf);
-	// if (websocket) {
-	// cb.getPipeline().addLast("handler", new
-	// OutboundWebsocketHandler(e.getChannel(), trafficLock));
-	// } else {
-	// cb.getPipeline().addLast("handler", new OutboundHandler(e.getChannel(),
-	// trafficLock));
-	// }
-	// ChannelFuture f = cb.connect(target);
-	//
-	// outboundChannel = f.getChannel();
-	// if (sendMsg != null)
-	// outboundChannel.write(sendMsg);
-	// f.addListener(new ChannelFutureListener() {
-	// public void operationComplete(ChannelFuture future) throws Exception {
-	// if (future.isSuccess()) {
-	// // Connection attempt succeeded:
-	// // Begin to accept incoming traffic.
-	// Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Created outbound connection to "
-	// + target + ".");
-	// inboundChannel.setReadable(true);
-	// } else {
-	// Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe("Failed to create outbound connection to "
-	// + target + ".");
-	// // Close the connection if the connection attempt has
-	// // failed.
-	// inboundChannel.close();
-	// }
-	// }
-	// });
-	// } else {
-	// if (sendMsg != null)
-	// outboundChannel.write(sendMsg);
-	// }
-	// }
 
 	@Override
 	public void messageReceived(ChannelHandlerContext ctx, final MessageEvent e) throws Exception {
@@ -185,11 +128,10 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			requestedServerId = getServerId(req.getUri());
 		}
 		if (upgradeHeader != null && upgradeHeader.toUpperCase().equals("WEBSOCKET") && (isVncServer || requestedServerId != null)) {
-			Logger.getLogger(WebsockifyProxyHandler.class.getName()).fine("Websocket request from " + e.getRemoteAddress() + ".");
+			Logger.getLogger(WebSocketProxyHandler.class.getName()).fine("Websocket request from " + e.getRemoteAddress() + ".");
 			// Handshake
 			WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(this.getWebSocketLocation(req), "base64", false);
 			this.handshaker = wsFactory.newHandshaker(req);
-			ChannelFuture future = null;
 			if (this.handshaker == null) {
 				wsFactory.sendUnsupportedWebSocketVersionResponse(ctx.getChannel());
 			} else {
@@ -201,7 +143,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 				if (protocol != null && secProtocol == null) {
 					req.addHeader("Sec-WebSocket-Protocol", protocol);
 				}
-				future = this.handshaker.handshake(ctx.getChannel(), req).syncUninterruptibly();
+				this.handshaker.handshake(ctx.getChannel(), req).syncUninterruptibly();
 			}
 			if (isVncServer) {
 				String serverId = req.getHeader("ServerId");
@@ -218,8 +160,11 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 					LiveSession liveSession = new LiveSession();
 					liveSession.setServerChannel(outboundVncChannel);
 					liveSession.setClientChannel(e.getChannel());
-//					WebsockifyProxyHandler.sessionMap.put(liveSession.getId(), liveSession);
-					WebsockifyProxyHandler.sessionMap.put(123, liveSession);
+					// WebsockifyProxyHandler.sessionMap.put(liveSession.getId(),
+					// liveSession);
+					WebSocketProxyHandler.sessionMap.put(123, liveSession);
+				} else {
+					// TODO
 				}
 				if (outboundVncChannel == null) {
 					return;
@@ -232,7 +177,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			HttpRequest request = (HttpRequest) e.getMessage();
 			String redirectUrl = isRedirect(request.getUri());
 			if (redirectUrl != null) {
-				Logger.getLogger(WebsockifyProxyHandler.class.getName()).fine("Redirecting to " + redirectUrl + ".");
+				Logger.getLogger(WebSocketProxyHandler.class.getName()).fine("Redirecting to " + redirectUrl + ".");
 				HttpResponse response = new DefaultHttpResponse(HTTP_1_1, TEMPORARY_REDIRECT);
 				response.setHeader(HttpHeaders.Names.LOCATION, redirectUrl);
 				sendHttpResponse(ctx, req, response);
@@ -277,7 +222,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 		}
 
 		if (this.outboundChannel == null) {
-			this.outboundChannel = WebsockifyProxyHandler.sessionMap.get(123).getClientChannel();
+			this.outboundChannel = WebSocketProxyHandler.sessionMap.get(123).getClientChannel();
 		}
 		if (this.outboundChannel != null) {
 			synchronized (trafficLock) {
@@ -305,7 +250,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			return;
 		}
 
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Web request from " + e.getRemoteAddress() + " for " + request.getUri() + ".");
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).info("Web request from " + e.getRemoteAddress() + " for " + request.getUri() + ".");
 
 		final String path = sanitizeUri(request.getUri());
 		if (path == null) {
@@ -413,7 +358,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 			try {
 				return URLDecoder.decode(urlParam, "UTF-8");
 			} catch (UnsupportedEncodingException e) {
-				Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe(e.getMessage());
+				Logger.getLogger(WebSocketProxyHandler.class.getName()).severe(e.getMessage());
 			}
 		}
 
@@ -549,7 +494,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 	@Override
 	public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
 
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Inbound proxy connection from " + ctx.getChannel().getRemoteAddress() + " closed.");
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).info("Inbound proxy connection from " + ctx.getChannel().getRemoteAddress() + " closed.");
 		// if (outboundChannel != null) {
 		// closeOnFlush(outboundChannel);
 		// }
@@ -558,7 +503,7 @@ public class WebsockifyProxyHandler extends SimpleChannelUpstreamHandler {
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
 		e.getCause().printStackTrace();
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe("Exception on inbound proxy connection from " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).severe("Exception on inbound proxy connection from " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
 		closeOnFlush(e.getChannel());
 	}
 

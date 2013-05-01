@@ -2,7 +2,7 @@ package com.netiq.websockify;
 
 import java.io.PrintStream;
 
-import com.netiq.websockify.WebsockifyServer.SSLSetting;
+import com.netiq.websockify.WebSocketServer.SSLSetting;
 
 public class Websockify {
 
@@ -24,9 +24,9 @@ public class Websockify {
 
 	private int sourcePort = 8000;
 
-//	private String targetHost = "localhost";
-//
-//	private int targetPort = 5900;
+	// private String targetHost = "localhost";
+	//
+	// private int targetPort = 5900;
 
 	public Websockify() {
 	}
@@ -76,29 +76,22 @@ public class Websockify {
 			}
 
 			try {
-				WebsockifySslContext.validateKeystore(keystore,
-						keystorePassword, keystoreKeyPassword);
+				WebsockifySslContext.validateKeystore(keystore, keystorePassword, keystoreKeyPassword);
 			} catch (Exception e) {
-				System.err.println("Error validating keystore: "
-						+ e.getMessage());
+				System.err.println("Error validating keystore: " + e.getMessage());
 				printUsage(System.err);
 				System.exit(2);
 			}
 		}
 
-//		System.out.println("Websockify Proxying *:" + sourcePort + " to "
-//				+ targetHost + ':' + targetPort + " ...");
 		if (sslSetting != SSLSetting.OFF)
-			System.out.println("SSL is "
-					+ (sslSetting == SSLSetting.REQUIRED ? "required."
-							: "enabled."));
+			System.out.println("SSL is " + (sslSetting == SSLSetting.REQUIRED ? "required." : "enabled."));
 
-		PortUnificationHandler
-				.setConnectionToFirstMessageTimeout(directProxyTimeout);
+		// PortUnificationHandler
+		// .setConnectionToFirstMessageTimeout(directProxyTimeout);
 
-		WebsockifyServer wss = new WebsockifyServer();
-		wss.connect(sourcePort, sslSetting, keystore,
-				keystorePassword, keystoreKeyPassword, webDirectory);
+		WebSocketServer wss = new WebSocketServer();
+		wss.initiate(sourcePort, sslSetting, keystore, keystorePassword, keystoreKeyPassword, webDirectory);
 
 	}
 

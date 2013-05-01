@@ -15,8 +15,6 @@
  */
 package com.netiq.websockify;
 
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.logging.Logger;
 
 import javax.net.ssl.SSLEngine;
@@ -35,14 +33,13 @@ import org.jboss.netty.handler.codec.http.HttpResponseEncoder;
 import org.jboss.netty.handler.ssl.SslHandler;
 import org.jboss.netty.handler.stream.ChunkedWriteHandler;
 
-import com.netiq.websockify.WebsockifyServer.SSLSetting;
+import com.netiq.websockify.WebSocketServer.SSLSetting;
 
 /**
  * Manipulates the current pipeline dynamically to switch protocols or enable
  * SSL or GZIP.
  */
-public class PortUnificationHandler extends FrameDecoder {
-	protected static long connectionToFirstMessageTimeout = 5000;
+public class HandlerManager extends FrameDecoder {
 
 	private final ClientSocketChannelFactory cf;
 	private final SSLSetting sslSetting;
@@ -50,15 +47,12 @@ public class PortUnificationHandler extends FrameDecoder {
 	private final String keystorePassword;
 	private final String keystoreKeyPassword;
 	private final String webDirectory;
-	private Timer msgTimer = null;
-	private long directConnectTimerStart = 0;
 
-	private PortUnificationHandler(ClientSocketChannelFactory cf, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory, final ChannelHandlerContext ctx) {
+	private HandlerManager(ClientSocketChannelFactory cf, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory, final ChannelHandlerContext ctx) {
 		this(cf, sslSetting, keystore, keystorePassword, keystoreKeyPassword, webDirectory);
-		startDirectConnectionTimer(ctx);
 	}
 
-	public PortUnificationHandler(ClientSocketChannelFactory cf, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory) {
+	public HandlerManager(ClientSocketChannelFactory cf, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory) {
 		this.cf = cf;
 		this.sslSetting = sslSetting;
 		this.keystore = keystore;
@@ -67,71 +61,12 @@ public class PortUnificationHandler extends FrameDecoder {
 		this.webDirectory = webDirectory;
 	}
 
-	public static long getConnectionToFirstMessageTimeout() {
-		return connectionToFirstMessageTimeout;
-	}
-
-	public static void setConnectionToFirstMessageTimeout(long connectionToFirstMessageTimeout) {
-		PortUnificationHandler.connectionToFirstMessageTimeout = connectionToFirstMessageTimeout;
-	}
-
-	// In cases where there will be a direct VNC proxy connection
-	// The client won't send any message because VNC servers talk first
-	// So we'll set a timer on the connection - if there's no message by the
-	// time
-	// the timer fires we'll create the proxy connection to the target
-	@Override
-	public void channelOpen(final ChannelHandlerContext ctx, final ChannelStateEvent e) throws Exception {
-		System.out.println("sco");
-		startDirectConnectionTimer(ctx);
-	}
-
-	private void startDirectConnectionTimer(final ChannelHandlerContext ctx) {
-		// cancel any outstanding timer
-		cancelDirectConnectionTimer();
-
-		// direct proxy connection disabled
-		if (connectionToFirstMessageTimeout <= 0)
-			return;
-
-		directConnectTimerStart = System.currentTimeMillis();
-
-		// cancelling a timer makes it unusable again, so we have to create
-		// another one
-		msgTimer = new Timer();
-		msgTimer.schedule(new TimerTask() {
-
-			@Override
-			public void run() {
-				switchToDirectProxy(ctx);
-			}
-
-		}, connectionToFirstMessageTimeout);
-
-	}
-
-	private void cancelDirectConnectionTimer() {
-		if (directConnectTimerStart > 0) {
-			long directConnectTimerCancel = System.currentTimeMillis();
-			Logger.getLogger(PortUnificationHandler.class.getName()).finer("Direct connection timer canceled after " + (directConnectTimerCancel - directConnectTimerStart) + " milliseconds.");
-		}
-
-		if (msgTimer != null) {
-			msgTimer.cancel();
-			msgTimer = null;
-		}
-
-	}
-
 	@Override
 	protected Object decode(ChannelHandlerContext ctx, Channel channel, ChannelBuffer buffer) throws Exception {
-		System.out.println("ddd");
 		// Will use the first two bytes to detect a protocol.
 		if (buffer.readableBytes() < 2) {
 			return null;
 		}
-
-		cancelDirectConnectionTimer();
 
 		final int magic1 = buffer.getUnsignedByte(buffer.readerIndex());
 		final int magic2 = buffer.getUnsignedByte(buffer.readerIndex() + 1);
@@ -171,65 +106,46 @@ public class PortUnificationHandler extends FrameDecoder {
 	private void enableSsl(ChannelHandlerContext ctx) {
 		ChannelPipeline p = ctx.getPipeline();
 
-		Logger.getLogger(PortUnificationHandler.class.getName()).fine("SSL request from " + ctx.getChannel().getRemoteAddress() + ".");
+		Logger.getLogger(HandlerManager.class.getName()).fine("SSL request from " + ctx.getChannel().getRemoteAddress() + ".");
 
 		SSLEngine engine = WebsockifySslContext.getInstance(keystore, keystorePassword, keystoreKeyPassword).getServerContext().createSSLEngine();
 		engine.setUseClientMode(false);
 
 		p.addLast("ssl", new SslHandler(engine));
-		p.addLast("unificationA", new PortUnificationHandler(cf, SSLSetting.OFF, keystore, keystorePassword, keystoreKeyPassword, webDirectory, ctx));
+		p.addLast("unificationA", new HandlerManager(cf, SSLSetting.OFF, keystore, keystorePassword, keystoreKeyPassword, webDirectory, ctx));
 		p.remove(this);
 	}
 
 	private void switchToWebsocketProxy(ChannelHandlerContext ctx) {
 		ChannelPipeline p = ctx.getPipeline();
 
-		Logger.getLogger(PortUnificationHandler.class.getName()).fine("Websocket proxy request from " + ctx.getChannel().getRemoteAddress() + ".");
+		Logger.getLogger(HandlerManager.class.getName()).fine("Websocket proxy request from " + ctx.getChannel().getRemoteAddress() + ".");
 
 		p.addLast("decoder", new HttpRequestDecoder());
 		p.addLast("aggregator", new HttpChunkAggregator(65536));
 		p.addLast("encoder", new HttpResponseEncoder());
 		p.addLast("chunkedWriter", new ChunkedWriteHandler());
-		// TODO
-		System.out.println("websocketproxy");
-		// p.addLast("handler", new WebSocketServerHandler());
-		p.addLast("handler", new WebsockifyProxyHandler(cf, webDirectory));
+		p.addLast("handler", new WebSocketProxyHandler(cf, webDirectory));
 		p.remove(this);
 	}
 
 	private void switchToFlashPolicy(ChannelHandlerContext ctx) {
 		ChannelPipeline p = ctx.getPipeline();
 
-		Logger.getLogger(PortUnificationHandler.class.getName()).fine("Flash policy request from " + ctx.getChannel().getRemoteAddress() + ".");
+		Logger.getLogger(HandlerManager.class.getName()).fine("Flash policy request from " + ctx.getChannel().getRemoteAddress() + ".");
 
 		p.addLast("flash", new FlashPolicyHandler());
 
 		p.remove(this);
 	}
 
-	private void switchToDirectProxy(ChannelHandlerContext ctx) {
-		ChannelPipeline p = ctx.getPipeline();
-
-		Logger.getLogger(PortUnificationHandler.class.getName()).fine("Direct proxy request from " + ctx.getChannel().getRemoteAddress() + ".");
-
-		// TODO
-		System.out.println("directproxy");
-		// p.addLast("handler", new WebSocketServerHandler());
-		p.addLast("proxy", new DirectProxyHandler(ctx.getChannel(), cf));
-
-		p.remove(this);
-	}
-
-	// cancel the timer if channel is closed - prevents useless stack traces
 	@Override
 	public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-		cancelDirectConnectionTimer();
 	}
 
-	// cancel the timer if exception is caught - prevents useless stack traces
 	@Override
 	public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
-		cancelDirectConnectionTimer();
-		Logger.getLogger(PortUnificationHandler.class.getName()).severe("Exception on connection to " + ctx.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
+		Logger.getLogger(HandlerManager.class.getName()).severe("Exception on connection to " + ctx.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
+		e.getCause().printStackTrace();
 	}
 }

@@ -55,6 +55,7 @@ public class SignInServlet extends HttpServlet {
 			}
 			response.sendRedirect("devices.jsp");
 		}
+		response.sendRedirect("devices.jsp");
 
 	}
 }

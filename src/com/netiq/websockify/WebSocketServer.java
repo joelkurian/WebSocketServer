@@ -16,7 +16,7 @@ import java.security.cert.CertificateException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-public class WebsockifyServer {
+public class WebSocketServer {
 	private Executor executor;
 	private ServerBootstrap sb;
 	private ClientSocketChannelFactory cf;
@@ -26,7 +26,7 @@ public class WebsockifyServer {
 		OFF, ON, REQUIRED
 	};
 
-	public WebsockifyServer() {
+	public WebSocketServer() {
 		// Configure the bootstrap.
 		executor = Executors.newCachedThreadPool();
 		sb = new ServerBootstrap(new NioServerSocketChannelFactory(executor, executor));
@@ -35,24 +35,16 @@ public class WebsockifyServer {
 		cf = new NioClientSocketChannelFactory(executor, executor);
 	}
 
-	public void connect(int localPort, String remoteHost, int remotePort) {
-		connect(localPort, remoteHost, remotePort, null);
-	}
-
-	public void connect(int localPort, String remoteHost, int remotePort, String webDirectory) {
-		connect(localPort, SSLSetting.OFF, null, null, null, webDirectory);
-	}
-
-	public void connect(int localPort, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory) {
+	public void initiate(int localPort, SSLSetting sslSetting, String keystore, String keystorePassword, String keystoreKeyPassword, String webDirectory) {
 		if (serverChannel != null) {
 			close();
 		}
 
-		sb.setPipelineFactory(new WebsockifyProxyPipelineFactory(cf, sslSetting, keystore, keystorePassword, keystoreKeyPassword, webDirectory));
+		sb.setPipelineFactory(new WebSocketServerPipelineFactory(cf, sslSetting, keystore, keystorePassword, keystoreKeyPassword, webDirectory));
 
 		sb.setOption("child.tcpNoDelay", true);
 		sb.setOption("child.keepAlive", true);
-		
+
 		// Start up the server.
 		serverChannel = sb.bind(new InetSocketAddress(localPort));
 	}

@@ -125,7 +125,7 @@ public class DirectProxyHandler extends SimpleChannelUpstreamHandler {
     @Override
     public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e)
             throws Exception {
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).info("Inbound proxy connection from " + ctx.getChannel().getRemoteAddress() + " closed.");
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).info("Inbound proxy connection from " + ctx.getChannel().getRemoteAddress() + " closed.");
         if (outboundChannel != null) {
             closeOnFlush(outboundChannel);
         }
@@ -135,7 +135,7 @@ public class DirectProxyHandler extends SimpleChannelUpstreamHandler {
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception {
         e.getCause().printStackTrace();
-		Logger.getLogger(WebsockifyProxyHandler.class.getName()).severe("Exception on inbound proxy connection from " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
+		Logger.getLogger(WebSocketProxyHandler.class.getName()).severe("Exception on inbound proxy connection from " + e.getChannel().getRemoteAddress() + ": " + e.getCause().getMessage());
         closeOnFlush(e.getChannel());
     }
 
