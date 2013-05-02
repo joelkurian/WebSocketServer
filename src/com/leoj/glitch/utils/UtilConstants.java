@@ -10,4 +10,5 @@ public class UtilConstants {
 		rootPath = realPath.replace("\\", "/");
 		sessionFactory = HibernateUtil.getSessionFactory();
 	}
+
 }

@@ -46,16 +46,15 @@ public class SignInServlet extends HttpServlet {
 			Session s = UtilConstants.sessionFactory.openSession();
 			s.beginTransaction();
 			Criteria c = s.createCriteria(User.class);
-			c.add(Restrictions.eq("emai", email)).add(Restrictions.eq("passwd", passwd)).setProjection(Projections.rowCount());
-			int count = (int) c.uniqueResult();
+			c.add(Restrictions.eq("email", email)).add(Restrictions.eq("passwd", passwd)).setProjection(Projections.rowCount());
+			long count = (long) c.uniqueResult();
 			if (count > 0) {
 				HttpSession httpSession = request.getSession();
+				response.sendRedirect("devices.jsp");
 			} else {
 				writer.write("invalid username/password");
 			}
-			response.sendRedirect("devices.jsp");
 		}
-		response.sendRedirect("devices.jsp");
 
 	}
 }

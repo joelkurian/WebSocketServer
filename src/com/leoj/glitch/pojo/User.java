@@ -9,6 +9,9 @@ public class User {
 	private String passwd;
 	private Set<Device> deviceSet;
 
+	public User() {
+	}
+
 	public User(String email, String passwd, Set<Device> deviceSet) {
 		super();
 		this.email = email;
